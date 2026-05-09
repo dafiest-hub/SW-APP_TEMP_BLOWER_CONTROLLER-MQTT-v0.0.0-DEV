@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#f97316">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Blower Controller</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+
+    <header class="header">
+      <h1 class="title">Blower Ctrl</h1>
+      <div class="status">
+        <span class="status-dot" id="statusDot"></span>
+        <span class="status-text" id="statusText">Desconectado</span>
+      </div>
+    </header>
+
+    <main class="main">
+
+      <section class="card temp-card">
+        <div class="temp-row">
+          <span class="temp-value" id="tempValue">--.-</span>
+          <span class="temp-unit">°C</span>
+        </div>
+        <div class="temp-label">Temperatura</div>
+      </section>
+
+      <section class="card speed-card">
+        <span class="speed-label">Velocidad actual</span>
+        <span class="speed-badge" id="speedBadge">--</span>
+      </section>
+
+      <section class="card control-card">
+        <div class="mode-toggle">
+          <button class="mode-btn active" id="btnAuto" onclick="setMode('auto')">Auto</button>
+          <button class="mode-btn" id="btnManual" onclick="setMode('manual')">Manual</button>
+        </div>
+
+        <div class="slider-wrapper" id="sliderWrapper">
+          <div class="slider-track">
+            <div class="slider-fill" id="sliderFill"></div>
+          </div>
+          <div class="slider-steps">
+            <button class="step active" data-level="0" onclick="setSpeed(0)">
+              <div class="step-dot"></div>
+              <span class="step-label">OFF</span>
+            </button>
+            <button class="step" data-level="1" onclick="setSpeed(1)">
+              <div class="step-dot"></div>
+              <span class="step-label">1</span>
+            </button>
+            <button class="step" data-level="2" onclick="setSpeed(2)">
+              <div class="step-dot"></div>
+              <span class="step-label">2</span>
+            </button>
+            <button class="step" data-level="3" onclick="setSpeed(3)">
+              <div class="step-dot"></div>
+              <span class="step-label">3</span>
+            </button>
+            <button class="step" data-level="4" onclick="setSpeed(4)">
+              <div class="step-dot"></div>
+              <span class="step-label">4</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="footer">
+      <button class="connect-btn" id="connectBtn" onclick="toggleConnect()">Conectar</button>
+      <div id="installPrompt" style="display:none">
+        <button class="install-btn" id="installBtn">Instalar app</button>
+      </div>
+    </footer>
+
+  </div>
+
+  <script src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('service-worker.js')
+          .catch(err => console.warn('SW error:', err));
+      });
+    }
+  </script>
+</body>
+</html>
