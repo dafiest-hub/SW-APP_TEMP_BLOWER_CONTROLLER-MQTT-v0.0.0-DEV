@@ -13,10 +13,18 @@ const TOPICS = {
 }
 
 // ── State ───────────────────────────────────────────────────────────────────
-let client = null
+let client      = null
 let isConnected = false
-let currentMode = 'auto'
-let selectedSpeed = 0
+
+// Last state confirmed by telemetry
+let confirmedMode  = 'auto'
+let confirmedSpeed = 0
+
+// Pending command awaiting device confirmation
+let pendingMode  = null   // 'auto' | 'manual' | null
+let pendingSpeed = null   // 0–4 | null
+let modeTimer    = null
+let speedTimer   = null
 
 // ── DOM refs ────────────────────────────────────────────────────────────────
 const dom = {
@@ -30,7 +38,18 @@ const dom = {
   sliderFill:    document.getElementById('sliderFill'),
   connectBtn:    document.getElementById('connectBtn'),
   installPrompt: document.getElementById('installPrompt'),
-  installBtn:    document.getElementById('installBtn')
+  installBtn:    document.getElementById('installBtn'),
+  toast:         document.getElementById('toast')
+}
+
+// ── Toast ───────────────────────────────────────────────────────────────────
+let toastHideTimer = null
+
+function showToast(msg) {
+  dom.toast.textContent = msg
+  dom.toast.classList.add('visible')
+  clearTimeout(toastHideTimer)
+  toastHideTimer = setTimeout(() => dom.toast.classList.remove('visible'), 3000)
 }
 
 // ── MQTT ────────────────────────────────────────────────────────────────────
@@ -56,12 +75,45 @@ function connectMQTT() {
   client.on('message', (_topic, payload) => {
     try {
       const data = JSON.parse(payload.toString())
+
+      // Temperature always follows telemetry
       if (data.temp !== undefined) {
         dom.tempValue.textContent = parseFloat(data.temp).toFixed(1)
       }
+
+      // Speed badge always follows telemetry; slider only if no pending
       if (data.speed !== undefined) {
-        dom.speedBadge.textContent = data.speed === 0 ? 'OFF' : String(data.speed)
+        const newSpeed = Number(data.speed)
+        dom.speedBadge.textContent = newSpeed === 0 ? 'OFF' : String(newSpeed)
+
+        if (pendingSpeed !== null) {
+          confirmedSpeed = newSpeed
+          if (newSpeed === pendingSpeed) {
+            clearTimeout(speedTimer)
+            pendingSpeed = null
+            speedTimer   = null
+            updateSliderUI(newSpeed)
+          }
+          // else: keep optimistic slider position until timer fires
+        } else {
+          confirmedSpeed = newSpeed
+          updateSliderUI(newSpeed)
+        }
       }
+
+      // Mode buttons always follow telemetry
+      if (data.mode !== undefined) {
+        const newMode = data.mode
+        confirmedMode = newMode
+        applyModeUI(newMode)
+
+        if (pendingMode !== null && newMode === pendingMode) {
+          clearTimeout(modeTimer)
+          pendingMode = null
+          modeTimer   = null
+        }
+      }
+
     } catch (_) { /* malformed — ignore */ }
   })
 
@@ -90,27 +142,51 @@ function publishCommand(payload) {
 // ── UI ──────────────────────────────────────────────────────────────────────
 function updateStatus(connected) {
   isConnected = connected
-  dom.statusDot.className  = 'status-dot' + (connected ? ' connected' : '')
+  dom.statusDot.className   = 'status-dot' + (connected ? ' connected' : '')
   dom.statusText.textContent = connected ? 'Conectado' : 'Desconectado'
   dom.connectBtn.textContent = connected ? 'Desconectar' : 'Conectar'
   dom.connectBtn.className   = 'connect-btn' + (connected ? ' connected' : '')
 }
 
-function setMode(mode) {
-  currentMode = mode
+function applyModeUI(mode) {
   dom.btnAuto.className   = 'mode-btn' + (mode === 'auto'   ? ' active' : '')
   dom.btnManual.className = 'mode-btn' + (mode === 'manual' ? ' active' : '')
   dom.sliderWrapper.className = 'slider-wrapper' + (mode === 'auto' ? ' disabled' : '')
+}
 
-  if (mode === 'auto') {
-    publishCommand({ mode: 'auto' })
-  }
+function setMode(mode) {
+  if (!isConnected) return
+  if (pendingMode === mode) return
+  if (pendingMode === null && confirmedMode === mode) return
+
+  clearTimeout(modeTimer)
+  publishCommand(mode === 'auto' ? { mode: 'auto' } : { mode: 'manual' })
+  pendingMode = mode
+
+  modeTimer = setTimeout(() => {
+    showToast('No se pudo cambiar el modo')
+    pendingMode = null
+    modeTimer   = null
+    applyModeUI(confirmedMode)
+  }, 5000)
 }
 
 function setSpeed(level) {
-  selectedSpeed = level
+  if (!isConnected) return
+  if (pendingSpeed === level) return
+  if (pendingSpeed === null && confirmedSpeed === level) return
+
+  clearTimeout(speedTimer)
   updateSliderUI(level)
   publishCommand({ speed: level, mode: 'manual' })
+  pendingSpeed = level
+
+  speedTimer = setTimeout(() => {
+    showToast('No se pudo cambiar la velocidad')
+    pendingSpeed = null
+    speedTimer   = null
+    updateSliderUI(confirmedSpeed)
+  }, 5000)
 }
 
 function updateSliderUI(level) {
@@ -140,4 +216,4 @@ dom.installBtn.addEventListener('click', () => {
 
 // ── Init ────────────────────────────────────────────────────────────────────
 updateSliderUI(0)
-setMode('auto')
+applyModeUI('auto')
