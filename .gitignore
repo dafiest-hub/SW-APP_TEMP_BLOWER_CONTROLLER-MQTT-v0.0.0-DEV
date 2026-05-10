@@ -13,3 +13,9 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Archivos de trabajo local (no van a GitHub)
+.claude/
+CLAUDE.md
+docs/
+crear-iconos.html
